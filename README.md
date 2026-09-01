@@ -19,10 +19,25 @@ it, `fetch_season_table` raises `ImportError: lxml not found`.
    extracts the largest HTML table on it (the odds table). The site renders
    its header as a plain data row instead of `<th>` cells, so the function
    promotes row 0 to column headers when pandas hasn't picked them up.
-2. **`parse_games(raw)`** — the raw table has one row per *team* (away and
-   home rows stacked back to back); this pairs consecutive rows into one row
-   per *game* and splits the dual-purpose Open/Close columns into separate
-   spread and total values.
+2. **`parse_games(raw, season_start_year)`** — the raw table has one row per
+   *team* (away and home rows stacked back to back); this pairs consecutive
+   rows into one row per *game*, splits the dual-purpose Open/Close columns
+   into separate spread and total values, and resolves the Date column into
+   a real `datetime` (see below).
+3. **Pulling data** — loops `season_url()` + `fetch_season_table` +
+   `parse_games` over every season in `SEASON_START_YEARS` (2007-08 through
+   2021-22), tags each game with its `season` label, concatenates everything,
+   and saves it to `nfl_odds_2007-2022.csv` next to the notebook.
+
+### Multi-season dates
+
+The site encodes Date as an integer `mmdd` with **no year** (e.g. `906` =
+Sep 6, `1216` = Dec 16, `203` = Feb 3) — month/day fall out of `divmod(x,
+100)` regardless of digit count. Since the year isn't in the data at all,
+`parse_games` infers it from `season_start_year`: Sep–Dec dates belong to the
+season's start year, Jan–Jun dates (playoffs / Super Bowl) belong to the
+following year. Verified against actual Super Bowl dates (e.g. 2007-08 season
+correctly ends 2008-02-03, the date of Super Bowl XLII).
 
 ## Raw column reference
 
@@ -31,7 +46,7 @@ followed by its matching home row):
 
 | Column | Meaning |
 |---|---|
-| **Date** | Game date as `mmdd`, no year (e.g. `909` = Sept 9) |
+| **Date** | Game date as `mmdd`, no year (e.g. `909` = Sept 9) — year is inferred during parsing, see [Multi-season dates](#multi-season-dates) |
 | **Rot** | Rotation number — a unique ID per team-in-a-game. Away/home rows are consecutive (e.g. 451/452), which is how rows get paired into a game |
 | **VH** | `V` = visiting (away) team's row, `H` = home team's row |
 | **Team** | Team name/abbreviation |
@@ -52,9 +67,10 @@ Each row of the returned DataFrame is one game:
 
 | Column | Meaning |
 |---|---|
-| `date` | Game date (`mmdd`) |
+| `date` | Game date as a real `datetime` (year resolved from `season_start_year`) |
 | `away_team` / `home_team` | Team names |
 | `away_score` / `home_score` | Final scores |
 | `away_ml` / `home_ml` | Moneyline odds for each team |
 | `open_spread` / `close_spread` | Point spread at open/close |
 | `open_total` / `close_total` | Over/under total at open/close |
+| `season` | Season label (e.g. `2021-22`) — added by the Pulling data loop, not by `parse_games` itself |
