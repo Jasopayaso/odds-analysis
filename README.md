@@ -21,9 +21,12 @@ it, `fetch_season_table` raises `ImportError: lxml not found`.
    promotes row 0 to column headers when pandas hasn't picked them up.
 2. **`parse_games(raw, season_start_year)`** — the raw table has one row per
    *team* (away and home rows stacked back to back); this pairs consecutive
-   rows into one row per *game*, splits the dual-purpose Open/Close columns
-   into separate spread and total values, and resolves the Date column into
-   a real `datetime` (see below).
+   rows into one row per *game*, splits the dual-purpose Close column into a
+   spread value and a total value, uses the moneylines to attribute the
+   spread to whichever team is favored (`away_spread` / `home_spread`), and
+   resolves the Date column into a real `datetime` (see below). The Open
+   column is fetched but currently dropped — it isn't carried into the
+   parsed output.
 3. **Pulling data** — loops `season_url()` + `fetch_season_table` +
    `parse_games` over every season in `SEASON_START_YEARS` (2007-08 through
    2021-22), tags each game with its `season` label, concatenates everything,
@@ -52,8 +55,8 @@ followed by its matching home row):
 | **Team** | Team name/abbreviation |
 | **1st / 2nd / 3rd / 4th** | Points scored by that team in each quarter |
 | **Final** | Final score for that team |
-| **Open** | Opening betting line. **Dual-purpose column**: for an away/home pair, one row holds the point spread and the other holds the game total (over/under). Disambiguated by magnitude — the larger absolute value is the total, the smaller is the spread |
-| **Close** | Same dual-purpose spread/total idea as Open, but the closing line (right before kickoff) |
+| **Open** | Opening betting line. Fetched but currently dropped during parsing — not carried into the parsed output |
+| **Close** | Closing betting line (right before kickoff). **Dual-purpose column**: for an away/home pair, one row holds the point spread and the other holds the game total (over/under). Disambiguated by magnitude — the larger absolute value is the total, the smaller is the spread |
 | **ML** | Moneyline odds, American format: negative = favorite (amount you must bet to win $100), positive = underdog (amount you win per $100 bet) |
 | **2H** | Second-half line — same dual-purpose spread/total format, but for second-half-only betting. Renamed to `second_half` during parsing but not currently split into its own spread/total |
 
@@ -71,6 +74,6 @@ Each row of the returned DataFrame is one game:
 | `away_team` / `home_team` | Team names |
 | `away_score` / `home_score` | Final scores |
 | `away_ml` / `home_ml` | Moneyline odds for each team |
-| `open_spread` / `close_spread` | Point spread at open/close |
-| `open_total` / `close_total` | Over/under total at open/close |
+| `away_spread` / `home_spread` | Closing point spread, attributed to whichever team it favors: the favored team (the one with the more negative moneyline) gets the spread value, the other team gets `0.0`. A tied moneyline (no favorite by ML) defaults the spread to `away_spread`. Values are always positive (no sign) — the smaller the number, the more favored that team is |
+| `close_total` | Over/under total at close |
 | `season` | Season label (e.g. `2021-22`) — added by the Pulling data loop, not by `parse_games` itself |
