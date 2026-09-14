@@ -77,3 +77,16 @@ Each row of the returned DataFrame is one game:
 | `away_spread` / `home_spread` | Closing point spread, attributed to whichever team it favors: the favored team (the one with the more negative moneyline) gets the spread value, the other team gets `0.0`. A tied moneyline (no favorite by ML) defaults the spread to `away_spread`. Values are always positive (no sign) — the smaller the number, the more favored that team is |
 | `close_total` | Over/under total at close |
 | `season` | Season label (e.g. `2021-22`) — added by the Pulling data loop, not by `parse_games` itself |
+| `home_win` | Added by `add_home_win()`: `1` if `home_score > away_score`, `0` if the home team lost, `NaN` on a tie or missing score |
+
+## Analysis (`analysis/conversions.ipynb`)
+
+Reads `nfl_odds_2007-2022.csv` and derives implied probabilities/scores from
+the raw lines. Each function mutates the shared `raw_data` DataFrame in
+place, adding its own columns:
+
+| Function | Columns added | What it does |
+|---|---|---|
+| `ml_vig_prob()` | `vig_prob`, `home_ml_prob`, `away_ml_prob` | Converts each team's moneyline to a raw implied probability via `ml_implied_prob()` (favorite and underdog moneylines use different formulas, picked by the odds' own sign — not by home/away), then normalizes `home_ml_prob`/`away_ml_prob` to remove the vig. `vig_prob` is the bookmaker's overround before normalizing |
+| `spread_prob()` | `home_spread_prob`, `away_spread_prob` | Fits a logistic regression of `home_win` on `away_spread` + `home_spread` and predicts each team's win probability from the closing spread. Using both columns (rather than a single unsigned spread) lets the model learn which team a given spread favors |
+| `implied_score()` | `h_impScore`, `a_impScore` | Backs out each team's implied score from `close_total` and the spread: `(total + your_spread - opponent_spread) / 2`. The two always sum back to `close_total` |
