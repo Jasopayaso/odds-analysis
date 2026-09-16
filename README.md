@@ -90,3 +90,31 @@ place, adding its own columns:
 | `ml_vig_prob()` | `vig_prob`, `home_ml_prob`, `away_ml_prob` | Converts each team's moneyline to a raw implied probability via `ml_implied_prob()` (favorite and underdog moneylines use different formulas, picked by the odds' own sign — not by home/away), then normalizes `home_ml_prob`/`away_ml_prob` to remove the vig. `vig_prob` is the bookmaker's overround before normalizing |
 | `spread_prob()` | `home_spread_prob`, `away_spread_prob` | Fits a logistic regression of `home_win` on `away_spread` + `home_spread` and predicts each team's win probability from the closing spread. Using both columns (rather than a single unsigned spread) lets the model learn which team a given spread favors |
 | `implied_score()` | `h_impScore`, `a_impScore` | Backs out each team's implied score from `close_total` and the spread: `(total + your_spread - opponent_spread) / 2`. The two always sum back to `close_total` |
+
+### Does the market agree with itself? (`home_prob_diff`)
+
+`home_prob_diff = home_ml_prob - home_spread_prob` measures how much the
+moneyline and the closing-spread model disagree about the home team's win
+probability. `dis_model` fits `Logit(home_win ~ home_prob_diff)` to test
+whether that disagreement itself predicts the outcome (H0: no relationship —
+a fully efficient market should show none).
+
+Result: the coefficient is negative and statistically significant
+(p = 0.002) — larger disagreement (moneyline more bullish on the home team
+than the spread model) is associated with a lower actual home win rate — but
+the effect is small (Pseudo R² = 0.0017) and the disagreement itself is tiny
+in practice: mean |`home_prob_diff`| is 0.019, and the two models only pick
+different favorites in 26 of 4025 games. Splitting games into 8 equal-sized
+buckets by `home_prob_diff` and plotting each bucket's actual home win rate
+with a 95% Wilson confidence interval against the baseline home win rate
+shows every bucket's interval overlapping both the baseline and its
+neighbors — i.e. not something the eye can distinguish bucket-by-bucket at
+this sample size, consistent with the tiny Pseudo R².
+
+| Function | Output | What it does |
+|---|---|---|
+| `plot_disagreement_bins(n_bins=8)` | `disagreement_bins.png` | Bins games by the **rank** of `home_prob_diff` (not its raw value) into `n_bins` equal-sized buckets — a plain value-based `qcut` produces uneven bucket sizes here since `home_prob_diff` is rounded to 2 decimals and many games tie at the same value. Plots each bucket's actual home win rate, with a 95% Wilson confidence interval, against the overall baseline home win rate |
+
+A `seaborn.histplot` of `home_prob_diff` (no dedicated function, inline in
+the notebook) shows the distribution is tightly clustered around 0 (std
+≈ 0.025) with a long, sparse tail out to ~0.44.
